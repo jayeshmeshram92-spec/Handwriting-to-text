@@ -26,12 +26,14 @@
 <div class="controls" style="margin-top:15px">
 <div class="control"><label>Image cleanup</label><select id="cleanup"><option value="balanced" selected>Balanced (recommended)</option><option value="strong">Strong black & white</option><option value="original">Original image</option></select></div>
 <div class="control"><label>Remove page border</label><select id="crop"><option value="8">8% (recommended)</option><option value="5">5%</option><option value="12">12%</option><option value="0">Off</option></select></div>
-<div class="control"><label>OCR layout</label><select id="psm"><option value="6" selected>Block of text</option><option value="3">Automatic</option><option value="4">Single column</option></select></div>
+<div class="control"><label>OCR layout</label><select id="psm"><option value="6" selected>Block of text</option><option value="4">Single column</option><option value="11">Sparse text</option><option value="3">Automatic</option></select></div>
+<div class="control"><label>Hindi handwriting mode</label><select id="handMode"><option value="smart" selected>Smart (recommended)</option><option value="line">Line-by-line</option><option value="full">Full page</option></select></div>
+<div class="control"><label>Ignore decorative header/footer</label><select id="decor"><option value="12" selected>12% top + 6% bottom</option><option value="18">18% top + 8% bottom</option><option value="0">Off</option></select></div>
 </div>
 <label class="check" style="margin-top:12px"><input id="upscale" type="checkbox" checked> Image ko 2× upscale karke OCR karein</label>
 <img id="thumb" class="thumb" alt="Selected image preview">
 <div id="status" style="margin-top:12px;color:#374151">Photo select karein.</div><div class="progress"><div class="bar" id="bar"></div></div>
-<div class="hint" style="margin-top:12px">⚠️ Handwritten Hindi OCR abhi bhi printed text se mushkil hota hai. Ye version image ko crop, grayscale, contrast/threshold aur upscale karke accuracy improve karta hai; perfect result ki guarantee nahi hai.</div>
+<div class="hint" style="margin-top:12px">⚠️ Hindi handwriting ke liye Smart/Line-by-line mode try karein. Ye version decorative header/footer ko hata kar text lines ko separately OCR karta hai. Handwriting OCR mein phir bhi kuch manual correction lag sakti hai.</div>
 </section>
 <section class="card"><h2>2. Edit converted text</h2><textarea id="text" placeholder="Converted text yahan dikhega..."></textarea><div class="row" style="margin-top:10px"><button class="secondary" id="copy">📋 Copy</button><button class="secondary" id="clear">🗑️ Clear</button></div></section>
 <section class="card"><h2>3. Paper & Font</h2><div class="controls"><div class="control"><label>Font</label><select id="font"><option value="Noto Sans Devanagari, Mangal, sans-serif">Noto Sans Devanagari</option><option value="Mangal, Noto Sans Devanagari, sans-serif">Mangal</option><option value="Arial, sans-serif">Arial</option><option value="Times New Roman, serif">Times New Roman</option><option value="serif">Serif</option></select></div><div class="control"><label>Font size</label><input id="size" type="range" min="12" max="48" value="22"></div><div class="control"><label>Line spacing</label><input id="spacing" type="range" min="1" max="2.5" step=".1" value="1.5"></div></div><div class="preview-wrap" style="margin-top:18px"><div id="paper" class="paper"></div></div><div class="row" style="margin-top:15px"><button onclick="window.print()">🖨️ Print / Save as PDF</button></div></section>
@@ -40,18 +42,85 @@
 const photo=document.getElementById('photo'),text=document.getElementById('text'),paper=document.getElementById('paper'),status=document.getElementById('status'),bar=document.getElementById('bar'),thumb=document.getElementById('thumb');
 photo.onchange=()=>{const f=photo.files[0];status.textContent=f?`Selected: ${f.name}`:'Photo select karein.';if(f){thumb.src=URL.createObjectURL(f);thumb.style.display='block'}};
 function loadImage(file){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=URL.createObjectURL(file)})}
-function preprocess(img,mode,cropPct,upscale){
- const crop=Math.max(0,Math.min(20,Number(cropPct)))/100; let sw=img.naturalWidth,sh=img.naturalHeight; let sx=sw*crop,sy=sh*crop,sWidth=sw-2*sx,sHeight=sh-2*sy;
- const scale=upscale?2:1; let w=Math.min(5000,Math.max(1200,Math.round(sWidth*scale))); let h=Math.min(5000,Math.max(1200,Math.round(sHeight*scale))); const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,sx,sy,sWidth,sHeight,0,0,w,h); if(mode==='original')return c;
- const d=x.getImageData(0,0,w,h),p=d.data; let sum=0,n=0;
- for(let i=0;i<p.length;i+=4){const g=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2];sum+=g;n++} const mean=sum/n; const contrast=mode==='strong'?1.55:1.28; const bias=mode==='strong'?8:0;
- for(let i=0;i<p.length;i+=4){let g=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2];g=(g-128)*contrast+128-bias;if(mode==='strong'){g=g<150?0:255}p[i]=p[i+1]=p[i+2]=Math.max(0,Math.min(255,g))}
+function preprocess(img,mode,cropPct,upscale,extraTop=0,extraBottom=0){
+ const baseCrop=Math.max(0,Math.min(20,Number(cropPct)))/100;
+ const top=baseCrop+Math.max(0,extraTop)/100;
+ const bottom=baseCrop+Math.max(0,extraBottom)/100;
+ let sw=img.naturalWidth,sh=img.naturalHeight;
+ let sx=sw*baseCrop,sy=sh*top,sWidth=sw*(1-baseCrop*2),sHeight=sh*(1-top-bottom);
+ sWidth=Math.max(50,sWidth);sHeight=Math.max(50,sHeight);
+ const scale=upscale?2:1; let w=Math.min(5000,Math.max(1400,Math.round(sWidth*scale))); let h=Math.min(5000,Math.max(1400,Math.round(sHeight*scale)));
+ const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});
+ x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(img,sx,sy,sWidth,sHeight,0,0,w,h);
+ if(mode==='original')return c;
+ const d=x.getImageData(0,0,w,h),p=d.data; const contrast=mode==='strong'?1.55:1.28;
+ for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];g=(g-128)*contrast+128;if(mode==='strong')g=g<155?0:255;p[i]=p[i+1]=p[i+2]=Math.max(0,Math.min(255,g))}
  x.putImageData(d,0,0);return c;
 }
-async function runOCR(){if(!photo.files[0])return alert('Pehle handwriting photo choose karein.');const lang=document.getElementById('lang').value;bar.style.width='0';status.textContent='Image prepare ho rahi hai...';
- try{const img=await loadImage(photo.files[0]);const canvas=preprocess(img,document.getElementById('cleanup').value,document.getElementById('crop').value,document.getElementById('upscale').checked);status.textContent='OCR model load ho raha hai...';
- const worker=await Tesseract.createWorker(lang,1,{logger:m=>{if(m.progress!=null)bar.style.width=Math.round(m.progress*100)+'%';if(m.status)status.textContent=m.status+' '+Math.round((m.progress||0)*100)+'%'}});await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:document.getElementById('psm').value});const result=await worker.recognize(canvas);await worker.terminate();text.value=result.data.text.trim();update();status.textContent='Conversion complete — text edit kar sakte hain.';}
- catch(e){console.error(e);status.textContent='OCR error: '+e.message;alert('OCR mein problem aayi. Hindi language model download ke liye internet on rakhein aur clear photo try karein.')}}
+function canvasFromImageData(imgData){const c=document.createElement('canvas');c.width=imgData.width;c.height=imgData.height;c.getContext('2d').putImageData(imgData,0,0);return c;}
+function findInkLines(canvas){
+ const w=canvas.width,h=canvas.height,ctx=canvas.getContext('2d',{willReadFrequently:true}),d=ctx.getImageData(0,0,w,h).data;
+ const rows=new Array(h).fill(0), step=Math.max(1,Math.floor(w/900));
+ for(let y=0;y<h;y+=1){let n=0;for(let x=0;x<w;x+=step){const i=(y*w+x)*4;const g=.299*d[i]+.587*d[i+1]+.114*d[i+2];if(g<180)n++;}rows[y]=n;}
+ // Smooth row projection to make handwriting strokes form stable bands.
+ const sm=new Array(h).fill(0);const r=3;for(let y=0;y<h;y++){let a=0,c=0;for(let k=-r;k<=r;k++){const yy=y+k;if(yy>=0&&yy<h){a+=rows[yy];c++;}}sm[y]=a/c;}
+ const threshold=Math.max(2,Math.min(Math.round(w/110),Math.round(w*.012)));
+ const bands=[];let inBand=false,start=0,quiet=0;
+ for(let y=0;y<h;y++){
+   if(sm[y]>=threshold){if(!inBand){start=y;inBand=true;}quiet=0;}
+   else if(inBand){quiet++;if(quiet>=6){const end=y-quiet;if(end-start>=7)bands.push([start,end]);inBand=false;}}
+ }
+ if(inBand&&h-start>=7)bands.push([start,h-1]);
+ // Merge nearby stroke bands (Devanagari matras can create gaps).
+ const merged=[];for(const b of bands){if(!merged.length||b[0]-merged[merged.length-1][1]>18)merged.push(b);else merged[merged.length-1][1]=b[1];}
+ return merged.filter(b=>b[1]-b[0]>=10);
+}
+function cropBand(canvas,y1,y2){
+ const pad=Math.max(12,Math.round(canvas.height*.012));const a=Math.max(0,y1-pad),b=Math.min(canvas.height,y2+pad);
+ const c=document.createElement('canvas');c.width=canvas.width;c.height=b-a;c.getContext('2d').drawImage(canvas,0,a,canvas.width,b-a,0,0,canvas.width,b-a);return c;
+}
+function cleanOCRText(s){
+ return s.replace(/\r/g,'').split('\n').map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(x=>x.length>1).join('\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+async function makeWorker(lang){
+ const worker=await Tesseract.createWorker(lang,1,{logger:m=>{if(m.progress!=null)bar.style.width=Math.round(m.progress*100)+'%';if(m.status)status.textContent=m.status+' '+Math.round((m.progress||0)*100)+'%'}});
+ await worker.setParameters({preserve_interword_spaces:'1',user_defined_dpi:'300'});return worker;
+}
+async function runOCR(){
+ if(!photo.files[0])return alert('Pehle handwriting photo choose karein.');
+ const lang=document.getElementById('lang').value, mode=document.getElementById('handMode').value;
+ bar.style.width='0';status.textContent='Image prepare ho rahi hai...';
+ try{
+   const img=await loadImage(photo.files[0]);
+   const decor=document.getElementById('decor').value;
+   let top=0,bottom=0;if(decor!=='0'){top=Number(decor);bottom=decor==='18'?8:6;}
+   const canvas=preprocess(img,document.getElementById('cleanup').value,document.getElementById('crop').value,document.getElementById('upscale').checked,top,bottom);
+   status.textContent='OCR model load ho raha hai...';const worker=await makeWorker(lang);
+   let finalText='';
+   if(lang==='hin' && mode!=='full'){
+     status.textContent='Hindi text lines detect ho rahi hain...';
+     const bands=findInkLines(canvas);
+     // If line detection is too fragmented, fall back to a full-column pass.
+     if(bands.length>=3 && bands.length<=80){
+       const parts=[];
+       for(let i=0;i<bands.length;i++){
+         const lineCanvas=cropBand(canvas,bands[i][0],bands[i][1]);
+         await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'7',user_defined_dpi:'300'});
+         const r=await worker.recognize(lineCanvas);
+         const t=cleanOCRText(r.data.text);
+         if(t) parts.push(t);
+         status.textContent=`Hindi line ${i+1}/${bands.length} read ho rahi hai...`;
+       }
+       finalText=parts.join('\n');
+     }
+   }
+   if(!finalText){
+     const psm=document.getElementById('psm').value;await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:psm,user_defined_dpi:'300'});
+     status.textContent='Page OCR ho raha hai...';const result=await worker.recognize(canvas);finalText=cleanOCRText(result.data.text);
+   }
+   await worker.terminate();text.value=finalText;update();status.textContent='Conversion complete — text edit kar sakte hain.';
+ }catch(e){console.error(e);status.textContent='OCR error: '+e.message;alert('OCR mein problem aayi. Internet on rakhein aur clear photo try karein.');}
+}
 document.getElementById('ocr').onclick=runOCR;text.oninput=update;function update(){paper.textContent=text.value;paper.style.fontFamily=document.getElementById('font').value;paper.style.fontSize=document.getElementById('size').value+'px';paper.style.lineHeight=document.getElementById('spacing').value}['font','size','spacing'].forEach(id=>document.getElementById(id).oninput=update);document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(text.value);alert('Text copied!')}catch(e){alert('Copy failed — text manually select karein.')}};document.getElementById('clear').onclick=()=>{text.value='';update();bar.style.width='0';status.textContent='Cleared.'};update();
 </script>
 </body></html>
