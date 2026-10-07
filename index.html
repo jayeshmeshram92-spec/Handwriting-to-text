@@ -3,104 +3,55 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Handwriting to Text</title>
+<title>Handwriting to Text — Improved OCR</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#f3f4f6;color:#111827}
-header{background:#111827;color:white;padding:18px 20px;text-align:center}header h1{margin:0;font-size:24px}header p{margin:5px 0 0;color:#d1d5db}
-main{max-width:1100px;margin:24px auto;padding:0 16px;display:grid;gap:20px}
-.card{background:white;border-radius:16px;padding:20px;box-shadow:0 5px 20px #0000000d}
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-button,.file-label,select,input{font:inherit}button,.file-label{border:0;border-radius:10px;padding:11px 16px;cursor:pointer;background:#111827;color:#fff}
-button.secondary{background:#e5e7eb;color:#111827}.file-label{display:inline-block}
-input[type=file]{display:none}select{padding:10px;border:1px solid #d1d5db;border-radius:9px}
-textarea{width:100%;min-height:260px;border:1px solid #d1d5db;border-radius:12px;padding:14px;font-size:18px;resize:vertical}
-.preview-wrap{display:flex;justify-content:center;background:#e5e7eb;padding:20px;border-radius:12px;overflow:auto}
-.paper{width:794px;min-height:1123px;background:white;padding:70px 65px;box-shadow:0 2px 12px #0002;white-space:pre-wrap;word-break:break-word}
-.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.control label{display:block;font-size:13px;color:#6b7280;margin-bottom:5px}
-#status{margin-top:12px;color:#374151}.progress{height:8px;background:#e5e7eb;border-radius:8px;overflow:hidden;margin-top:8px}.bar{height:100%;width:0;background:#111827;transition:.2s}
-@media(max-width:700px){.paper{width:100%;min-height:700px;padding:35px 25px}.preview-wrap{padding:8px}}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#f3f4f6;color:#111827}header{background:#111827;color:#fff;padding:18px 20px;text-align:center}header h1{margin:0;font-size:24px}header p{margin:5px 0 0;color:#d1d5db}main{max-width:1100px;margin:24px auto;padding:0 16px;display:grid;gap:20px}.card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 5px 20px #0000000d}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}button,.file-label,select,input{font:inherit}button,.file-label{border:0;border-radius:10px;padding:11px 16px;cursor:pointer;background:#111827;color:#fff}.secondary{background:#e5e7eb!important;color:#111827!important}.file-label{display:inline-block}input[type=file]{display:none}select{padding:10px;border:1px solid #d1d5db;border-radius:9px;background:#fff}textarea{width:100%;min-height:280px;border:1px solid #d1d5db;border-radius:12px;padding:14px;font-size:18px;resize:vertical}.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.control label{display:block;font-size:13px;color:#6b7280;margin-bottom:5px}.preview-wrap{display:flex;justify-content:center;background:#e5e7eb;padding:20px;border-radius:12px;overflow:auto}.paper{width:794px;min-height:1123px;background:#fff;padding:70px 65px;box-shadow:0 2px 12px #0002;white-space:pre-wrap;word-break:break-word}.progress{height:8px;background:#e5e7eb;border-radius:8px;overflow:hidden;margin-top:8px}.bar{height:100%;width:0;background:#111827;transition:.2s}.hint{background:#fff7ed;border:1px solid #fed7aa;padding:12px;border-radius:10px;color:#9a3412;font-size:14px}.check{display:flex;gap:8px;align-items:center;font-size:14px;color:#374151}.check input{width:18px;height:18px}.thumb{max-width:100%;max-height:260px;border-radius:10px;border:1px solid #ddd;margin-top:12px;display:none}@media(max-width:700px){.paper{width:100%;min-height:700px;padding:35px 25px}.preview-wrap{padding:8px}}
+@media print{body{background:#fff}.card:not(:has(#paper)){display:none}.preview-wrap{padding:0;background:#fff}.paper{box-shadow:none;width:100%;min-height:auto}}
 </style>
 </head>
 <body>
-<header><h1>✍️ Handwriting → Text</h1><p>Photo upload • Hindi/English OCR • Edit • Font preview • Print/PDF</p></header>
+<header><h1>✍️ Handwriting → Text</h1><p>Hindi/English OCR • image cleanup • editable text • font preview</p></header>
 <main>
 <section class="card">
-  <h2>1. Handwriting photo</h2><p style="color:#6b7280;margin-top:-8px">Language चुनें — Hindi, Marathi, English और कई अन्य languages supported.</p>
-  <div class="row">
-    <label class="file-label" for="photo">📷 Photo चुनें</label>
-    <input id="photo" type="file" accept="image/*">
-    <select id="lang" aria-label="OCR language">
-<option value="eng">English</option><option value="hin">Hindi</option><option value="hin+eng">Hindi + English</option>
-<option value="mar">Marathi</option><option value="guj">Gujarati</option><option value="ben">Bengali</option>
-<option value="tam">Tamil</option><option value="tel">Telugu</option><option value="kan">Kannada</option>
-<option value="mal">Malayalam</option><option value="pan">Punjabi</option><option value="urd">Urdu</option>
-<option value="ara">Arabic</option><option value="fra">French</option><option value="deu">German</option>
-<option value="spa">Spanish</option><option value="ita">Italian</option><option value="por">Portuguese</option>
-<option value="rus">Russian</option><option value="jpn">Japanese</option><option value="kor">Korean</option>
-<option value="chi_sim">Chinese (Simplified)</option><option value="chi_tra">Chinese (Traditional)</option>
-<option value="nld">Dutch</option><option value="tur">Turkish</option><option value="pol">Polish</option>
-<option value="vie">Vietnamese</option><option value="ind">Indonesian</option>
-<option value="tha">Thai</option><option value="heb">Hebrew</option>
-<option value="ell">Greek</option><option value="ron">Romanian</option>
+<h2>1. Handwriting photo</h2>
+<p style="color:#6b7280;margin-top:-8px">Hindi handwriting ke liye <b>Hindi</b> select karein. Best result ke liye photo clear, seedhi aur achchi light mein ho.</p>
+<div class="row">
+<label class="file-label" for="photo">📷 Photo चुनें</label><input id="photo" type="file" accept="image/*">
+<select id="lang" aria-label="OCR language">
+<option value="eng">English</option><option value="hin" selected>Hindi</option><option value="hin+eng">Hindi + English</option><option value="mar">Marathi</option><option value="guj">Gujarati</option><option value="ben">Bengali</option><option value="tam">Tamil</option><option value="tel">Telugu</option><option value="kan">Kannada</option><option value="mal">Malayalam</option><option value="pan">Punjabi</option><option value="urd">Urdu</option><option value="ara">Arabic</option><option value="fra">French</option><option value="deu">German</option><option value="spa">Spanish</option><option value="ita">Italian</option><option value="por">Portuguese</option><option value="rus">Russian</option><option value="jpn">Japanese</option><option value="kor">Korean</option><option value="chi_sim">Chinese (Simplified)</option><option value="chi_tra">Chinese (Traditional)</option><option value="nld">Dutch</option><option value="tur">Turkish</option><option value="pol">Polish</option><option value="vie">Vietnamese</option><option value="ind">Indonesian</option><option value="tha">Thai</option><option value="heb">Hebrew</option><option value="ell">Greek</option><option value="ron">Romanian</option>
 </select>
-    <button id="ocr">🔎 Convert to Text</button>
-  </div>
-  <div id="status">कोई photo select नहीं की गई।</div><div class="progress"><div class="bar" id="bar"></div></div>
+<button id="ocr">🔎 Convert to Text</button>
+</div>
+<div class="controls" style="margin-top:15px">
+<div class="control"><label>Image cleanup</label><select id="cleanup"><option value="balanced" selected>Balanced (recommended)</option><option value="strong">Strong black & white</option><option value="original">Original image</option></select></div>
+<div class="control"><label>Remove page border</label><select id="crop"><option value="8">8% (recommended)</option><option value="5">5%</option><option value="12">12%</option><option value="0">Off</option></select></div>
+<div class="control"><label>OCR layout</label><select id="psm"><option value="6" selected>Block of text</option><option value="3">Automatic</option><option value="4">Single column</option></select></div>
+</div>
+<label class="check" style="margin-top:12px"><input id="upscale" type="checkbox" checked> Image ko 2× upscale karke OCR karein</label>
+<img id="thumb" class="thumb" alt="Selected image preview">
+<div id="status" style="margin-top:12px;color:#374151">Photo select karein.</div><div class="progress"><div class="bar" id="bar"></div></div>
+<div class="hint" style="margin-top:12px">⚠️ Handwritten Hindi OCR abhi bhi printed text se mushkil hota hai. Ye version image ko crop, grayscale, contrast/threshold aur upscale karke accuracy improve karta hai; perfect result ki guarantee nahi hai.</div>
 </section>
-
-<section class="card">
-  <h2>2. Edit converted text</h2>
-  <textarea id="text" placeholder="Converted text यहाँ दिखाई देगा..."></textarea>
-  <div class="row" style="margin-top:10px">
-    <button class="secondary" id="copy">📋 Copy</button>
-    <button class="secondary" id="clear">🗑️ Clear</button>
-  </div>
-</section>
-
-<section class="card">
-  <h2>3. Paper & Font</h2>
-  <div class="controls">
-    <div class="control"><label>Font</label><select id="font">
-      <option value="Noto Sans Devanagari">Noto Sans Devanagari</option>
-      <option value="Mangal">Mangal</option>
-      <option value="Arial">Arial</option>
-      <option value="Times New Roman">Times New Roman</option>
-      <option value="serif">Serif</option>
-    </select></div>
-    <div class="control"><label>Font size</label><input id="size" type="range" min="12" max="48" value="22"></div>
-    <div class="control"><label>Line spacing</label><input id="spacing" type="range" min="1" max="2.5" step=".1" value="1.5"></div>
-  </div>
-  <div class="preview-wrap" style="margin-top:18px"><div id="paper" class="paper"></div></div>
-  <div class="row" style="margin-top:15px">
-    <button onclick="window.print()">🖨️ Print / Save as PDF</button>
-  </div>
-</section>
+<section class="card"><h2>2. Edit converted text</h2><textarea id="text" placeholder="Converted text yahan dikhega..."></textarea><div class="row" style="margin-top:10px"><button class="secondary" id="copy">📋 Copy</button><button class="secondary" id="clear">🗑️ Clear</button></div></section>
+<section class="card"><h2>3. Paper & Font</h2><div class="controls"><div class="control"><label>Font</label><select id="font"><option value="Noto Sans Devanagari, Mangal, sans-serif">Noto Sans Devanagari</option><option value="Mangal, Noto Sans Devanagari, sans-serif">Mangal</option><option value="Arial, sans-serif">Arial</option><option value="Times New Roman, serif">Times New Roman</option><option value="serif">Serif</option></select></div><div class="control"><label>Font size</label><input id="size" type="range" min="12" max="48" value="22"></div><div class="control"><label>Line spacing</label><input id="spacing" type="range" min="1" max="2.5" step=".1" value="1.5"></div></div><div class="preview-wrap" style="margin-top:18px"><div id="paper" class="paper"></div></div><div class="row" style="margin-top:15px"><button onclick="window.print()">🖨️ Print / Save as PDF</button></div></section>
 </main>
 <script>
-const photo=document.getElementById('photo'), text=document.getElementById('text'), paper=document.getElementById('paper');
-const status=document.getElementById('status'), bar=document.getElementById('bar');
-photo.onchange=()=>status.textContent=photo.files[0]?`Selected: ${photo.files[0].name}`:'कोई photo select नहीं की गई।';
-async function runOCR(){
- if(!photo.files[0]) return alert('पहले handwriting photo चुनें।');
- const lang=document.getElementById('lang').value; status.textContent='OCR चल रहा है...';
- try{
-   const result=await Tesseract.recognize(photo.files[0],lang,{logger:m=>{
-     if(m.progress!=null) bar.style.width=Math.round(m.progress*100)+'%';
-     if(m.status) status.textContent=m.status+' '+Math.round((m.progress||0)*100)+'%';
-   }});
-   text.value=result.data.text.trim(); update();
-   status.textContent='Conversion complete — text को edit कर सकते हैं।';
- }catch(e){status.textContent='OCR error: '+e.message; alert('OCR में समस्या आई। साफ और अच्छी रोशनी वाली photo try करें।')}
+const photo=document.getElementById('photo'),text=document.getElementById('text'),paper=document.getElementById('paper'),status=document.getElementById('status'),bar=document.getElementById('bar'),thumb=document.getElementById('thumb');
+photo.onchange=()=>{const f=photo.files[0];status.textContent=f?`Selected: ${f.name}`:'Photo select karein.';if(f){thumb.src=URL.createObjectURL(f);thumb.style.display='block'}};
+function loadImage(file){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=URL.createObjectURL(file)})}
+function preprocess(img,mode,cropPct,upscale){
+ const crop=Math.max(0,Math.min(20,Number(cropPct)))/100; let sw=img.naturalWidth,sh=img.naturalHeight; let sx=sw*crop,sy=sh*crop,sWidth=sw-2*sx,sHeight=sh-2*sy;
+ const scale=upscale?2:1; let w=Math.min(5000,Math.max(1200,Math.round(sWidth*scale))); let h=Math.min(5000,Math.max(1200,Math.round(sHeight*scale))); const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,sx,sy,sWidth,sHeight,0,0,w,h); if(mode==='original')return c;
+ const d=x.getImageData(0,0,w,h),p=d.data; let sum=0,n=0;
+ for(let i=0;i<p.length;i+=4){const g=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2];sum+=g;n++} const mean=sum/n; const contrast=mode==='strong'?1.55:1.28; const bias=mode==='strong'?8:0;
+ for(let i=0;i<p.length;i+=4){let g=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2];g=(g-128)*contrast+128-bias;if(mode==='strong'){g=g<150?0:255}p[i]=p[i+1]=p[i+2]=Math.max(0,Math.min(255,g))}
+ x.putImageData(d,0,0);return c;
 }
-document.getElementById('ocr').onclick=runOCR;
-text.oninput=update;
-function update(){paper.textContent=text.value;paper.style.fontFamily=document.getElementById('font').value;paper.style.fontSize=document.getElementById('size').value+'px';paper.style.lineHeight=document.getElementById('spacing').value}
-['font','size','spacing'].forEach(id=>document.getElementById(id).oninput=update);
-document.getElementById('copy').onclick=async()=>{await navigator.clipboard.writeText(text.value);alert('Text copied!')};
-document.getElementById('clear').onclick=()=>{text.value='';update();bar.style.width='0';status.textContent='Cleared.'};
-update();
+async function runOCR(){if(!photo.files[0])return alert('Pehle handwriting photo choose karein.');const lang=document.getElementById('lang').value;bar.style.width='0';status.textContent='Image prepare ho rahi hai...';
+ try{const img=await loadImage(photo.files[0]);const canvas=preprocess(img,document.getElementById('cleanup').value,document.getElementById('crop').value,document.getElementById('upscale').checked);status.textContent='OCR model load ho raha hai...';
+ const worker=await Tesseract.createWorker(lang,1,{logger:m=>{if(m.progress!=null)bar.style.width=Math.round(m.progress*100)+'%';if(m.status)status.textContent=m.status+' '+Math.round((m.progress||0)*100)+'%'}});await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:document.getElementById('psm').value});const result=await worker.recognize(canvas);await worker.terminate();text.value=result.data.text.trim();update();status.textContent='Conversion complete — text edit kar sakte hain.';}
+ catch(e){console.error(e);status.textContent='OCR error: '+e.message;alert('OCR mein problem aayi. Hindi language model download ke liye internet on rakhein aur clear photo try karein.')}}
+document.getElementById('ocr').onclick=runOCR;text.oninput=update;function update(){paper.textContent=text.value;paper.style.fontFamily=document.getElementById('font').value;paper.style.fontSize=document.getElementById('size').value+'px';paper.style.lineHeight=document.getElementById('spacing').value}['font','size','spacing'].forEach(id=>document.getElementById(id).oninput=update);document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(text.value);alert('Text copied!')}catch(e){alert('Copy failed — text manually select karein.')}};document.getElementById('clear').onclick=()=>{text.value='';update();bar.style.width='0';status.textContent='Cleared.'};update();
 </script>
-</body>
-</html>
+</body></html>
